@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vespera — a chess coach for the quiet hours</title>
+<meta name="description" content="Play a humanlike chess AI, get move-by-move coaching, drill your mistakes, and — new — hear your coach talk you through the game." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<style>
+  :root{
+    --bg: #10142a;
+    --bg-deep: #0a0d1f;
+    --panel: #171c3b;
+    --panel-line: #2a3062;
+    --board-light: #ece3cf;
+    --board-dark: #6b5138;
+    --amber: #e8a33d;
+    --amber-soft: #f4c878;
+    --good: #6fa98a;
+    --warn: #e0b54b;
+    --bad: #d9694f;
+    --text: #f4efe1;
+    --text-muted: #a7acc6;
+    --text-dim: #6c7196;
+    --serif: 'Source Serif 4', Georgia, serif;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  img,svg{display:block;max-width:100%;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 32px;}
+  @media (max-width:720px){.wrap{padding:0 20px;}}
+
+  /* subtle night-sky texture */
+  body{
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, rgba(244,239,225,0.35), transparent),
+      radial-gradient(1px 1px at 78% 8%, rgba(244,239,225,0.25), transparent),
+      radial-gradient(1.5px 1.5px at 40% 32%, rgba(244,239,225,0.3), transparent),
+      radial-gradient(1px 1px at 92% 44%, rgba(244,239,225,0.2), transparent),
+      radial-gradient(1px 1px at 60% 6%, rgba(244,239,225,0.2), transparent),
+      radial-gradient(1px 1px at 24% 60%, rgba(244,239,225,0.15), transparent),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 30%);
+    background-repeat:no-repeat;
+    background-size:100% 900px;
+  }
+
+  /* ---------- nav ---------- */
+  header.nav{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 0 0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:20px;letter-spacing:.01em;}
+  .brand .mark{
+    width:26px;height:26px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--amber-soft), var(--amber) 55%, #a9711f 100%);
+    box-shadow:0 0 18px rgba(232,163,61,.55);
+    flex:none;
+  }
+  nav.links{display:flex;gap:30px;font-size:14.5px;color:var(--text-muted);}
+  nav.links a{text-decoration:none;transition:color .15s;}
+  nav.links a:hover{color:var(--text);}
+  .nav-cta{
+    font-size:14px;font-weight:600;color:var(--bg-deep);
+    background:var(--amber-soft);padding:9px 18px;border-radius:5px;
+    text-decoration:none;
+  }
+  @media (max-width:720px){ nav.links{display:none;} }
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:grid;grid-template-columns:1.05fr 1fr;gap:56px;
+    align-items:center;
+    padding:76px 0 100px;
+  }
+  @media (max-width:920px){ .hero{grid-template-columns:1fr;padding:44px 0 60px;gap:40px;} }
+  .eyebrow{
+    color:var(--amber-soft);font-size:14.5px;font-style:italic;font-family:var(--serif);
+    margin:0 0 18px;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:clamp(36px, 4.6vw, 58px);
+    line-height:1.06;
+    margin:0 0 22px;
+    letter-spacing:-.01em;
+  }
+  h1 em{color:var(--amber-soft);font-style:normal;}
+  .lede{
+    font-size:18px;color:var(--text-muted);max-width:46ch;margin:0 0 34px;
+  }
+  .hero-ctas{display:flex;gap:14px;flex-wrap:wrap;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:13px 22px;border-radius:5px;font-size:15px;font-weight:600;
+    text-decoration:none;cursor:pointer;border:1px solid transparent;
+    font-family:var(--sans);
+  }
+  .btn-primary{background:var(--amber);color:#241705;}
+  .btn-primary:hover{background:var(--amber-soft);}
+  .btn-ghost{border-color:var(--panel-line);color:var(--text);background:transparent;}
+  .btn-ghost:hover{border-color:var(--text-muted);}
+
+  .hero-stats{display:flex;gap:34px;margin-top:40px;}
+  .hero-stats div{border-left:1px solid var(--panel-line);padding-left:14px;}
+  .hero-stats b{display:block;font-family:var(--serif);font-size:22px;color:var(--amber-soft);}
+  .hero-stats span{font-size:13px;color:var(--text-dim);}
+
+  /* ---------- board ---------- */
+  .board-card{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:20px;
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.6);
+  }
+  .board-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .board-topbar .who{font-size:13.5px;color:var(--text-muted);display:flex;align-items:center;gap:8px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);}
+  .board-outer{
+    position:relative;
+    aspect-ratio:1/1;
+    border-radius:4px;
+    overflow:hidden;
+    box-shadow:0 0 0 6px #241a0f, 0 0 0 7px var(--panel-line);
+  }
+  #board{
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(8,1fr);
+    width:100%;height:100%;
+  }
+  .sq{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;}
+  .sq.light{background:var(--board-light);}
+  .sq.dark{background:var(--board-dark);}
+  .sq .piece{font-size:min(6.6vw,38px);line-height:1;transition:transform .08s;pointer-events:none;}
+  .sq.selected{box-shadow:inset 0 0 0 3px var(--amber);}
+  .sq.legal::after{
+    content:'';position:absolute;width:26%;height:26%;border-radius:50%;
+    background:rgba(232,163,61,.55);
+  }
+  .sq.legal.capture::after{
+    width:78%;height:78%;border-radius:50%;background:transparent;
+    box-shadow:inset 0 0 0 4px rgba(217,105,79,.65);
+  }
+  .sq.lastmove{box-shadow:inset 0 0 0 3px rgba(232,163,61,.5);}
+  .sq.check{box-shadow:inset 0 0 0 3px var(--bad);}
+  .coord{position:absolute;font-size:9px;font-weight:700;opacity:.55;}
+  .coord.file{bottom:2px;right:3px;}
+  .coord.rank{top:2px;left:3px;}
+  .sq.light .coord{color:var(--board-dark);}
+  .sq.dark .coord{color:var(--board-light);}
+
+  .board-controls{display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:14px;flex-wrap:wrap;}
+  .difficulty{display:flex;flex-direction:column;gap:6px;flex:1;min-width:180px;}
+  .difficulty label{font-size:12px;color:var(--text-dim);display:flex;justify-content:space-between;}
+  .difficulty input[type=range]{width:100%;accent-color:var(--amber);}
+  .btn-small{
+    padding:9px 14px;border-radius:5px;font-size:13.5px;font-weight:600;
+    background:transparent;border:1px solid var(--panel-line);color:var(--text-muted);cursor:pointer;
+  }
+  .btn-small:hover{border-color:var(--text-muted);color:var(--text);}
+
+  .feedback-feed{margin-top:14px;display:flex;flex-direction:column;gap:6px;max-height:118px;overflow-y:auto;}
+  .fb-row{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text-muted);}
+  .fb-tag{
+    font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;
+    text-transform:uppercase;letter-spacing:.03em;flex:none;
+  }
+  .fb-tag.best{background:rgba(111,169,138,.18);color:var(--good);}
+  .fb-tag.good{background:rgba(111,169,138,.12);color:var(--good);}
+  .fb-tag.inacc{background:rgba(224,181,75,.16);color:var(--warn);}
+  .fb-tag.mistake{background:rgba(224,181,75,.2);color:var(--warn);}
+  .fb-tag.blunder{background:rgba(217,105,79,.2);color:var(--bad);}
+  .fb-tag.info{background:rgba(167,172,198,.15);color:var(--text-muted);}
+
+  /* ---------- section shell ---------- */
+  section{padding:96px 0;border-top:1px solid var(--panel-line);}
+  .section-head{max-width:640px;margin-bottom:56px;}
+  .section-head .eyebrow{margin-bottom:14px;}
+  h2{font-family:var(--serif);font-weight:600;font-size:clamp(28px,3vw,38px);margin:0 0 16px;line-height:1.15;}
+  .section-head p{color:var(--text-muted);font-size:17px;margin:0;max-width:52ch;}
+
+  /* ---------- feature rows ---------- */
+  .feature-row{
+    display:grid;grid-template-columns:.85fr 1.15fr;gap:60px;align-items:center;
+    padding:52px 0;border-top:1px solid var(--panel-line);
+  }
+  .feature-row:first-of-type{border-top:none;padding-top:0;}
+  .feature-row.reverse{grid-template-columns:1.15fr .85fr;}
+  .feature-row.reverse .feature-copy{order:2;}
+  @media (max-width:860px){
+    .feature-row, .feature-row.reverse{grid-template-columns:1fr;}
+    .feature-row.reverse .feature-copy{order:0;}
+  }
+  .feature-num{font-family:var(--serif);font-style:italic;color:var(--amber-soft);font-size:15px;margin-bottom:10px;display:block;}
+  .feature-copy h3{font-family:var(--serif);font-size:25px;font-weight:600;margin:0 0 14px;}
+  .feature-copy p{color:var(--text-muted);font-size:16px;margin:0 0 8px;max-width:44ch;}
+  .feature-visual{
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;
+    padding:26px;min-height:220px;display:flex;flex-direction:column;justify-content:center;gap:12px;
+  }
+
+  /* mini demo styling inside feature visuals */
+  .mock-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-deep);border-radius:6px;border:1px solid var(--panel-line);}
+  .mock-row .chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;flex:none;}
+  .mock-row .txt{font-size:13.5px;color:var(--text-muted);}
+  .pgn-line{font-family:var(--serif);font-size:15px;color:var(--text);}
+  .pgn-line b{color:var(--amber-soft);}
+
+  .puzzle-preview{display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:center;background:var(--bg-deep);border:1px solid var(--panel-line);border-radius:6px;padding:12px;}
+  .puzzle-mini{width:96px;height:96px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);border-radius:4px;overflow:hidden;}
+  .puzzle-mini div{background:var(--board-light);}
+  .puzzle-mini div:nth-child(odd){background:var(--board-dark);}
+  .puzzle-mini div:nth-child(4n+1),.puzzle-mini div:nth-child(4n+3){}
+
+  /* ---------- trainer (mistakes) ---------- */
+  .trainer-shell{
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;padding:32px;
+    display:grid;grid-template-columns:.9fr 1.1fr;gap:36px;
+  }
+  @media (max-width:820px){ .trainer-shell{grid-template-columns:1fr;} }
+  .puzzle-list{display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding-right:6px;}
+  .puzzle-item{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--bg-deep);border:1px solid var(--panel-line);border-radius:6px;padding:12px 14px;
+    cursor:pointer;transition:border-color .15s;
+  }
+  .puzzle-item:hover{border-color:var(--amber);}
+  .puzzle-item .meta{font-size:12.5px;color:var(--text-dim);}
+  .puzzle-item .lbl{font-size:14px;font-weight:600;}
+  .empty-state{color:var(--text-dim);font-size:14.5px;padding:24px;text-align:center;border:1px dashed var(--panel-line);border-radius:8px;}
+  #puzzleBoard .sq .piece{font-size:min(6vw,32px);}
+  .puzzle-status{font-size:13.5px;color:var(--text-muted);margin-top:12px;min-height:20px;}
+
+  /* ---------- coach / spoken feature ---------- */
+  .coach-panel{
+    background:linear-gradient(160deg, #201a3d, var(--panel));
+    border:1px solid var(--panel-line);border-radius:10px;padding:34px;
+    display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;
+  }
+  @media (max-width:820px){ .coach-panel{grid-template-columns:1fr;} }
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--panel-line);}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row .lbl{font-size:14.5px;}
+  .toggle-row .sub{font-size:12.5px;color:var(--text-dim);margin-top:2px;}
+  .switch{position:relative;width:44px;height:24px;flex:none;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider-toggle{position:absolute;inset:0;background:#3a3f66;border-radius:20px;cursor:pointer;transition:.2s;}
+  .slider-toggle::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--text);border-radius:50%;transition:.2s;}
+  input:checked + .slider-toggle{background:var(--amber);}
+  input:checked + .slider-toggle::before{transform:translateX(20px);background:#241705;}
+  select.tone-select{
+    background:var(--bg-deep);border:1px solid var(--panel-line);color:var(--text);
+    padding:8px 10px;border-radius:5px;font-size:13.5px;font-family:var(--sans);
+  }
+  .say-log{
+    background:var(--bg-deep);border:1px solid var(--panel-line);border-radius:8px;padding:18px;
+    min-height:140px;display:flex;flex-direction:column;gap:10px;justify-content:flex-end;
+  }
+  .say-bubble{font-family:var(--serif);font-size:15px;color:var(--amber-soft);font-style:italic;line-height:1.5;}
+  .say-bubble .who{display:block;font-family:var(--sans);font-style:normal;font-size:11px;letter-spacing:.03em;color:var(--text-dim);margin-bottom:3px;}
+
+  /* ---------- footer ---------- */
+  footer{padding:52px 0 60px;}
+  .foot-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+  .foot-row .brand{font-size:16px;}
+  footer p{color:var(--text-dim);font-size:13px;margin:0;}
+  .foot-links{display:flex;gap:22px;font-size:13.5px;color:var(--text-muted);}
+  .foot-links a{text-decoration:none;}
+  .foot-links a:hover{color:var(--text);}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--panel-line);border-radius:8px;}
+
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="nav">
+    <div class="brand"><span class="mark"></span>Vespera Chess</div>
+    <nav class="links">
+      <a href="#play">Play</a>
+      <a href="#features">How it works</a>
+      <a href="#trainer">Mistake trainer</a>
+      <a href="#coach">Coach, out loud</a>
+    </nav>
+    <a class="nav-cta" href="#play">Play free</a>
+  </header>
+
+  <section class="hero" id="play" style="border-top:none;padding-top:66px;">
+    <div>
+      <p class="eyebrow">A chess AI that plays like a person, at any hour</p>
+      <h1>Practice chess against an opponent who <em>thinks</em> like you do.</h1>
+      <p class="lede">Vespera plays humanlike openings, humanlike mistakes, and humanlike timing — from nervous beginner to seasoned club player — and grades every move you make so you know exactly what to fix.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#" id="newGameBtn">Start a game</a>
+        <a class="btn btn-ghost" href="#coach">Meet the spoken coach →</a>
+      </div>
+      <div class="hero-stats">
+        <div><b id="statMoves">0</b><span>moves played</span></div>
+        <div><b id="statBlunders">0</b><span>mistakes logged</span></div>
+        <div><b id="statPuzzles">0</b><span>puzzles waiting</span></div>
+      </div>
+    </div>
+
+    <div class="board-card">
+      <div class="board-topbar">
+        <div class="who"><span class="dot"></span><span id="turnLabel">Your move — playing White</span></div>
+        <button class="btn-small" id="undoBtn">Undo</button>
+      </div>
+      <div class="board-outer"><div id="board"></div></div>
+      <div class="board-controls">
+        <div class="difficulty">
+          <label><span>Opponent strength</span><span id="diffLabel">Club player</span></label>
+          <input type="range" min="0" max="100" value="55" id="diffSlider" />
+        </div>
+        <button class="btn-small" id="resetBtn">New position</button>
+      </div>
+      <div class="feedback-feed" id="feedbackFeed"></div>
+    </div>
+  </section>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">How Vespera trains you</p>
+      <h2>Four habits of a good coach, built into the board.</h2>
+      <p>Every part of Vespera exists to answer one question after every move: was that good, and if not, what should you have played instead?</p>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-copy">
+        <span class="feature-num">Humanlike play</span>
+        <h3>An opponent that misses things too.</h3>
+        <p>Slide the strength dial from a shaky beginner to a sharp club player. Vespera doesn't calculate flawlessly — it plays the moves a person at that level would actually find, mistakes included.</p>
+        <p>That means real practice: openings that get met with normal replies, not engine refutations on move six.</p>
+      </div>
+      <div class="feature-visual">
+        <div class="mock-row"><span class="chip" style="background:rgba(111,169,138,.18);color:var(--good);">Beginner</span><span class="txt">Wanders the queenside, forgets the clock</span></div>
+        <div class="mock-row"><span class="chip" style="background:rgba(224,181,75,.18);color:var(--warn);">Club player</span><span class="txt">Solid openings, occasional tactical slip</span></div>
+        <div class="mock-row"><span class="chip" style="background:rgba(217,105,79,.18);color:var(--bad);">Sharp</span><span class="txt">Punishes loose moves, rarely blunders</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row reverse">
+      <div class="feature-copy">
+        <span class="feature-num">Move grading</span>
+        <h3>Every move, graded the moment you play it.</h3>
+        <p>Best, good, inaccuracy, mistake, or blunder — Vespera compares what you played against what was available and tells you instantly, without breaking the flow of the game.</p>
+      </div>
+      <div class="feature-visual">
+        <div class="pgn-line">14. <b>Nxe5</b> <span style="color:var(--text-dim)">Qxe5?</span> 15. d4</div>
+        <div class="mock-row"><span class="fb-tag mistake">Mistake</span><span class="txt">Walks into a pawn fork — Qd6 kept the edge</span></div>
+        <div class="mock-row"><span class="fb-tag best">Best</span><span class="txt">Nxe5 was the top choice in this position</span></div>
+      </div>
+    </div>
+
+    <div class="feature-row">
+      <div class="feature-copy">
+        <span class="feature-num">Mistake puzzles</span>
+        <h3>Your blunders become tomorrow's puzzles.</h3>
+        <p>Every mistake and blunder is saved as a position for you to replay, so the exact idea that beat you today gets drilled until it doesn't beat you again.</p>
+      </div>
+      <div class="feature-visual">
+        <div class="puzzle-preview">
+          <div class="puzzle-mini">
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+          </div>
+          <div>
+            <div class="lbl">Find the save — move 22</div>
+            <div class="meta">From your game against Club player · Blunder</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="trainer">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Your mistakes, saved</p>
+      <h2>Play a few moves, then come drill what went wrong.</h2>
+      <p>Every position where Vespera flagged a mistake or blunder shows up here. Click one to try finding the better move.</p>
+    </div>
+    <div class="trainer-shell">
+      <div>
+        <div id="puzzleList" class="puzzle-list">
+          <div class="empty-state">No puzzles yet — play a game above, and any inaccuracies get saved here automatically.</div>
+        </div>
+      </div>
+      <div>
+        <div class="board-outer" style="max-width:340px;margin:0 auto;"><div id="puzzleBoard"></div></div>
+        <div class="puzzle-status" id="puzzleStatus" style="text-align:center;">Select a puzzle to begin.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="coach">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">New — not in the original app</p>
+      <h2>A coach you can hear, not just read.</h2>
+      <p>Turn on spoken commentary and Vespera talks you through the game out loud as you play — useful with your eyes on the board, or for anyone who'd rather be told than have to read it.</p>
+    </div>
+
+    <div class="coach-panel">
+      <div>
+        <div class="toggle-row">
+          <div>
+            <div class="lbl">Speak feedback aloud</div>
+            <div class="sub">Narrates each move grade as you play</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="speakToggle"><span class="slider-toggle"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="lbl">Coach's tone</div>
+            <div class="sub">Changes how feedback is phrased, spoken and written</div>
+          </div>
+          <select class="tone-select" id="toneSelect">
+            <option value="encouraging">Encouraging</option>
+            <option value="direct">Straight-talking</option>
+            <option value="formal">Grandmaster-formal</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="lbl">Test the voice</div>
+            <div class="sub">Hear a sample line in the current tone</div>
+          </div>
+          <button class="btn-small" id="testVoiceBtn">Play sample</button>
+        </div>
+      </div>
+      <div class="say-log" id="sayLog">
+        <div class="say-bubble"><span class="who">Vespera</span>Turn on speech, and I'll talk you through the game as it happens.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-row">
+      <div class="brand"><span class="mark"></span>Vespera Chess</div>
+      <div class="foot-links">
+        <a href="#play">Play</a>
+        <a href="#trainer">Mistake trainer</a>
+        <a href="#coach">Spoken coach</a>
+      </div>
+      <p>Built as a design study inspired by Noctie.ai — not affiliated with Noctie AB.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const PIECE_GLYPH = {
+    wp:'♙', wn:'♘', wb:'♗', wr:'♖', wq:'♕', wk:'♔',
+    bp:'♟', bn:'♞', bb:'♝', br:'♜', bq:'♛', bk:'♚'
+  };
+  const VALUES = { p:100, n:320, b:330, r:500, q:900, k:0 };
+  const FILES = ['a','b','c','d','e','f','g','h'];
+
+  // ---------- shared eval / search ----------
+  function evaluateBoard(game){
+    const board = game.board();
+    let total = 0;
+    for (const row of board){
+      for (const sq of row){
+        if (!sq) continue;
+        const v = VALUES[sq.type];
+        total += sq.color === 'w' ? v : -v;
+      }
+    }
+    return total;
+  }
+
+  function minimax(game, depth, alpha, beta, maximizing){
+    if (depth === 0 || game.game_over()) return evaluateBoard(game);
+    const moves = game.moves();
+    if (maximizing){
+      let best = -Infinity;
+      for (const m of moves){
+        game.move(m);
+        const ev = minimax(game, depth - 1, alpha, beta, false);
+        game.undo();
+        if (ev > best) best = ev;
+        if (ev > alpha) alpha = ev;
+        if (beta <= alpha) break;
+      }
+      return best;
+    } else {
+      let best = Infinity;
+      for (const m of moves){
+        game.move(m);
+        const ev = minimax(game, depth - 1, alpha, beta, true);
+        game.undo();
+        if (ev < best) best = ev;
+        if (ev < beta) beta = ev;
+        if (beta <= alpha) break;
+      }
+      return best;
+    }
+  }
+
+  function scoredMoves(game, depth, maximizingRoot){
+    const moves = game.moves();
+    const out = [];
+    for (const m of moves){
+      game.move(m);
+      const ev = minimax(game, Math.max(depth - 1, 0), -Infinity, Infinity, !maximizingRoot);
+      game.undo();
+      out.push({ san: m, eval: ev });
+    }
+    out.sort((a, b) => maximizingRoot ? b.eval - a.eval : a.eval - b.eval);
+    return out;
+  }
+
+  function classify(deltaCentipawns){
+    if (deltaCentipawns <= 0) return { key:'best', label:'Best move' };
+    if (deltaCentipawns <= 25) return { key:'good', label:'Good' };
+    if (deltaCentipawns <= 70) return { key:'inacc', label:'Inaccuracy' };
+    if (deltaCentipawns <= 180) return { key:'mistake', label:'Mistake' };
+    return { key:'blunder', label:'Blunder' };
+  }
+
+  // ---------- coach voice copy ----------
+  const TONE_LINES = {
+    best:      { encouraging:"Nice — that's the strongest move here.", direct:"Correct, that's the best move.", formal:"An accurate move; theory approves." },
+    good:      { encouraging:"Good choice, that keeps you comfortable.", direct:"Solid. Keeps your position fine.", formal:"A sound continuation, if not the sharpest." },
+    inacc:     { encouraging:"Small slip there — nothing serious, just a touch loose.", direct:"That's an inaccuracy. There was something better.", formal:"Imprecise. A stronger continuation was available." },
+    mistake:   { encouraging:"That one gave something back — let's remember this position.", direct:"That's a mistake. You handed back your advantage.", formal:"An error of judgment; the position has shifted." },
+    blunder:   { encouraging:"Ouch — that drops material. Happens to everyone, take it back and look again.", direct:"Blunder. That loses material outright.", formal:"A decisive error. Material has been lost." }
+  };
+
+  function speak(text){
+    if (!('speechSynthesis' in window)) return;
+    try{
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0; u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    }catch(e){ /* speech unsupported, fail silently */ }
+  }
+
+  function logSay(text){
+    const log = document.getElementById('sayLog');
+    const b = document.createElement('div');
+    b.className = 'say-bubble';
+    b.innerHTML = '<span class="who">Vespera</span>' + text;
+    log.appendChild(b);
+    while (log.children.length > 4) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // ================= MAIN GAME =================
+  const game = new Chess();
+  let selected = null;
+  let legalTargets = [];
+  let lastMove = null;
+  let moveCount = 0;
+  let blunderCount = 0;
+  const puzzles = [];
+
+  const boardEl = document.getElementById('board');
+  const turnLabel = document.getElementById('turnLabel');
+  const feedbackFeed = document.getElementById('feedbackFeed');
+  const diffSlider = document.getElementById('diffSlider');
+  const diffLabel = document.getElementById('diffLabel');
+  const statMoves = document.getElementById('statMoves');
+  const statBlunders = document.getElementById('statBlunders');
+  const statPuzzles = document.getElementById('statPuzzles');
+
+  function difficultyName(v){
+    if (v < 20) return 'Beginner';
+    if (v < 45) return 'Improving';
+    if (v < 70) return 'Club player';
+    if (v < 90) return 'Strong';
+    return 'Sharp';
+  }
+  diffSlider.addEventListener('input', () => { diffLabel.textContent = difficultyName(+diffSlider.value); });
+
+  function squareName(fileIdx, rankIdx){ return FILES[fileIdx] + (8 - rankIdx); }
+
+  function renderBoard(){
+    boardEl.innerHTML = '';
+    const board = game.board();
+    const inCheckColor = game.in_check() ? game.turn() : null;
+    for (let r = 0; r < 8; r++){
+      for (let f = 0; f < 8; f++){
+        const sqName = squareName(f, r);
+        const cell = document.createElement('div');
+        cell.className = 'sq ' + (((r + f) % 2 === 0) ? 'light' : 'dark');
+        cell.dataset.sq = sqName;
+
+        if (selected === sqName) cell.classList.add('selected');
+        if (lastMove && (lastMove.from === sqName || lastMove.to === sqName)) cell.classList.add('lastmove');
+        if (legalTargets.some(t => t.to === sqName)){
+          cell.classList.add('legal');
+          const t = legalTargets.find(t => t.to === sqName);
+          if (t.flags && t.flags.indexOf('c') !== -1) cell.classList.add('capture');
+        }
+
+        const piece = board[r][f];
+        if (piece){
+          const span = document.createElement('span');
+          span.className = 'piece';
+          span.textContent = PIECE_GLYPH[piece.color + piece.type];
+          cell.appendChild(span);
+          if (inCheckColor && piece.type === 'k' && piece.color === inCheckColor) cell.classList.add('check');
+        }
+        if (f === 0){ const c = document.createElement('span'); c.className='coord rank'; c.textContent = 8 - r; cell.appendChild(c); }
+        if (r === 7){ const c = document.createElement('span'); c.className='coord file'; c.textContent = FILES[f]; cell.appendChild(c); }
+
+        cell.addEventListener('click', () => onSquareClick(sqName));
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function onSquareClick(sqName){
+    if (game.turn() !== 'w' || game.game_over()) return;
+
+    if (selected){
+      const isTarget = legalTargets.some(t => t.to === sqName);
+      if (isTarget){
+        playPlayerMove(selected, sqName);
+        selected = null; legalTargets = [];
+        renderBoard();
+        return;
+      }
+    }
+    const piece = game.get(sqName);
+    if (piece && piece.color === 'w'){
+      selected = sqName;
+      legalTargets = game.moves({ square: sqName, verbose: true });
+    } else {
+      selected = null; legalTargets = [];
+    }
+    renderBoard();
+  }
+
+  function addFeedback(tagKey, tagText, text){
+    const row = document.createElement('div');
+    row.className = 'fb-row';
+    row.innerHTML = '<span class="fb-tag ' + tagKey + '">' + tagText + '</span><span>' + text + '</span>';
+    feedbackFeed.prepend(row);
+  }
+
+  function currentTone(){ return document.getElementById('toneSelect').value; }
+
+  function coachSay(catKey, extra){
+    const line = TONE_LINES[catKey][currentTone()];
+    const full = extra ? line + ' ' + extra : line;
+    logSay(full);
+    if (document.getElementById('speakToggle').checked) speak(full);
+  }
+
+  function playPlayerMove(from, to){
+    // Determine best available move BEFORE playing, to grade the played move.
+    const depth = 2;
+    const before = scoredMoves(game, depth, true); // maximizing = white to move
+    const bestEval = before.length ? before[0].eval : evaluateBoard(game);
+
+    const fenBefore = game.fen();
+    const verbose = game.moves({ square: from, verbose: true }).find(m => m.to === to);
+    let promotion = undefined;
+    if (verbose && verbose.flags.indexOf('p') !== -1) promotion = 'q';
+
+    const moved = game.move({ from, to, promotion });
+    if (!moved) return;
+
+    moveCount++; statMoves.textContent = moveCount;
+    lastMove = { from, to };
+
+    const playedEntry = before.find(b => b.san === moved.san);
+    const playedEval = playedEntry ? playedEntry.eval : evaluateBoard(game);
+    const delta = Math.max(0, bestEval - playedEval);
+    const cat = classify(delta);
+
+    const bestSan = before.length ? before[0].san : null;
+    let detail = moved.san;
+    if (cat.key !== 'best' && bestSan) detail += ' — ' + bestSan + ' was stronger';
+    addFeedback(cat.key, cat.label, detail);
+    coachSay(cat.key, (cat.key === 'mistake' || cat.key === 'blunder') && bestSan ? ('Try ' + bestSan + ' next time.') : '');
+
+    if (cat.key === 'mistake' || cat.key === 'blunder'){
+      blunderCount++; statBlunders.textContent = blunderCount;
+      puzzles.push({ fen: fenBefore, badMove: moved.san, bestMove: bestSan, label: (cat.key === 'blunder' ? 'Blunder' : 'Mistake') + ' on move ' + moveCount });
+      statPuzzles.textContent = puzzles.length;
+      renderPuzzleList();
+    }
+
+    turnLabel.textContent = 'Vespera is thinking…';
+    renderBoard();
+    updateGameOverIfAny();
+
+    if (!game.game_over()){
+      setTimeout(aiMove, 420);
+    }
+  }
+
+  function aiMove(){
+    if (game.turn() !== 'b' || game.game_over()) return;
+    const strength = +diffSlider.value; // 0..100
+    const depth = strength < 35 ? 1 : (strength < 75 ? 2 : 3);
+    const ranked = scoredMoves(game, depth, false); // minimizing = black to move, best = most negative
+    if (!ranked.length) return;
+
+    const topK = Math.max(1, Math.round(ranked.length * (1 - strength / 100) * 0.6) + 1);
+    const pool = ranked.slice(0, Math.min(topK, ranked.length));
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+
+    const moved = game.move(choice.san);
+    if (moved){
+      lastMove = { from: moved.from, to: moved.to };
+      addFeedback('info', 'Vespera', moved.san + (moved.flags.indexOf('c') !== -1 ? ' — takes' : ''));
+    }
+    turnLabel.textContent = 'Your move — playing White';
+    renderBoard();
+    updateGameOverIfAny();
+  }
+
+  function updateGameOverIfAny(){
+    if (!game.game_over()) return;
+    let msg = 'Game over.';
+    if (game.in_checkmate()) msg = (game.turn() === 'w' ? 'Checkmate — Vespera wins.' : 'Checkmate — you win!');
+    else if (game.in_draw()) msg = 'Draw.';
+    turnLabel.textContent = msg;
+    addFeedback('info', 'Game', msg);
+    coachSay('best', msg);
+  }
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    game.undo(); game.undo();
+    selected = null; legalTargets = []; lastMove = null;
+    turnLabel.textContent = 'Your move — playing White';
+    renderBoard();
+  });
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    game.reset();
+    selected = null; legalTargets = []; lastMove = null;
+    turnLabel.textContent = 'Your move — playing White';
+    renderBoard();
+  });
+  document.getElementById('newGameBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('resetBtn').click();
+    document.getElementById('play').scrollIntoView({ behavior:'smooth' });
+  });
+
+  renderBoard();
+
+  // ================= PUZZLE TRAINER =================
+  const puzzleGame = new Chess();
+  let activePuzzle = null;
+  const puzzleBoardEl = document.getElementById('puzzleBoard');
+  const puzzleListEl = document.getElementById('puzzleList');
+  const puzzleStatusEl = document.getElementById('puzzleStatus');
+  let puzzleSelected = null;
+  let puzzleTargets = [];
+
+  function renderPuzzleList(){
+    if (!puzzles.length){
+      puzzleListEl.innerHTML = '<div class="empty-state">No puzzles yet — play a game above, and any inaccuracies get saved here automatically.</div>';
+      return;
+    }
+    puzzleListEl.innerHTML = '';
+    puzzles.forEach((p, i) => {
+      const item = document.createElement('div');
+      item.className = 'puzzle-item';
+      item.innerHTML = '<div><div class="lbl">' + p.label + '</div><div class="meta">Find the better move</div></div><div class="meta">#' + (i + 1) + '</div>';
+      item.addEventListener('click', () => loadPuzzle(i));
+      puzzleListEl.appendChild(item);
+    });
+  }
+
+  function loadPuzzle(i){
+    activePuzzle = puzzles[i];
+    puzzleGame.load(activePuzzle.fen);
+    puzzleSelected = null; puzzleTargets = [];
+    puzzleStatusEl.textContent = 'Find a stronger move than ' + activePuzzle.badMove + '.';
+    renderPuzzleBoard();
+  }
+
+  function renderPuzzleBoard(){
+    puzzleBoardEl.innerHTML = '';
+    const board = puzzleGame.board();
+    for (let r = 0; r < 8; r++){
+      for (let f = 0; f < 8; f++){
+        const sqName = squareName(f, r);
+        const cell = document.createElement('div');
+        cell.className = 'sq ' + (((r + f) % 2 === 0) ? 'light' : 'dark');
+        cell.dataset.sq = sqName;
+        if (puzzleSelected === sqName) cell.classList.add('selected');
+        if (puzzleTargets.some(t => t.to === sqName)) cell.classList.add('legal');
+
+        const piece = board[r][f];
+        if (piece){
+          const span = document.createElement('span');
+          span.className = 'piece';
+          span.textContent = PIECE_GLYPH[piece.color + piece.type];
+          cell.appendChild(span);
+        }
+        cell.addEventListener('click', () => onPuzzleClick(sqName));
+        puzzleBoardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function onPuzzleClick(sqName){
+    if (!activePuzzle) return;
+    if (puzzleSelected){
+      const target = puzzleTargets.find(t => t.to === sqName);
+      if (target){
+        const moved = puzzleGame.move({ from: puzzleSelected, to: sqName, promotion: 'q' });
+        puzzleSelected = null; puzzleTargets = [];
+        if (moved){
+          if (activePuzzle.bestMove && moved.san === activePuzzle.bestMove){
+            puzzleStatusEl.textContent = "✓ That's the stronger move — well found.";
+          } else {
+            puzzleStatusEl.textContent = 'Played ' + moved.san + '. The suggested improvement was ' + activePuzzle.bestMove + '.';
+          }
+        }
+        renderPuzzleBoard();
+        return;
+      }
+    }
+    const piece = puzzleGame.get(sqName);
+    if (piece && piece.color === puzzleGame.turn()){
+      puzzleSelected = sqName;
+      puzzleTargets = puzzleGame.moves({ square: sqName, verbose: true });
+    } else {
+      puzzleSelected = null; puzzleTargets = [];
+    }
+    renderPuzzleBoard();
+  }
+
+  renderPuzzleList();
+
+  // ================= SPOKEN COACH SAMPLE =================
+  document.getElementById('testVoiceBtn').addEventListener('click', () => {
+    const tone = currentTone();
+    const sample = TONE_LINES.mistake[tone];
+    logSay(sample);
+    speak(sample);
+  });
+  document.getElementById('toneSelect').addEventListener('change', () => {
+    const tone = currentTone();
+    logSay('Tone set to ' + document.getElementById('toneSelect').selectedOptions[0].text + '.');
+  });
+})();
+</script>
+</body>
+</html>
